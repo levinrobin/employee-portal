@@ -1,0 +1,50 @@
+apiVersion: networking.k8s.io/v1
+
+kind: Ingress
+
+metadata:
+
+  name: employee-portal-ingress
+
+  namespace: employee-portal
+
+  annotations:
+kubernetes.io/ingress.class: "gce"
+kubernetes.io/ingress.allow-http: "true"
+
+spec:
+
+  rules:
+
+    - http:
+
+        paths:
+
+          - path: /api
+
+            pathType: Prefix
+
+            backend:
+
+              service:
+
+                name: employee-portal-backend
+
+                port:
+
+                  number: 3001
+
+          - path: /
+
+            pathType: Prefix
+
+            backend:
+
+              service:
+
+                name: employee-portal-frontend
+
+                port:
+
+                  number: 3000
+ 

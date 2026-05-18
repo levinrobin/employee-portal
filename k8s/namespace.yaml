@@ -1,0 +1,14 @@
+apiVersion: v1
+
+kind: Namespace
+
+metadata:
+
+  name: employee-portal
+
+  labels:
+
+    app: employee-portal
+
+    environment: prod
+ 

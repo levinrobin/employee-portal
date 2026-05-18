@@ -1,0 +1,32 @@
+apiVersion: v1
+
+kind: Service
+
+metadata:
+
+  name: employee-portal-backend
+
+  namespace: employee-portal
+
+  labels:
+
+    app: employee-portal-backend
+
+spec:
+
+  type: ClusterIP
+
+  selector:
+
+    app: employee-portal-backend
+
+  ports:
+
+    - name: http
+
+      port: 3001
+
+      targetPort: 3001
+
+      protocol: TCP
+ 

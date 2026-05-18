@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+
+kind: Deployment
+
+metadata:
+
+  name: employee-portal-frontend
+
+  namespace: employee-portal
+
+  labels:
+
+    app: employee-portal-frontend
+
+spec:
+
+  replicas: 2
+
+  selector:
+
+    matchLabels:
+
+      app: employee-portal-frontend
+
+  strategy:
+
+    type: RollingUpdate
+
+    rollingUpdate:
+
+      maxSurge: 1
+
+      maxUnavailable: 0
+
+  template:
+
+    metadata:
+
+      labels:
+
+        app: employee-portal-frontend
+
+    spec:
+
+      containers:
+
+        - name: frontend
+
+          image: us-central1-docker.pkg.dev/levin-495707/employee-portal/frontend:latest
+
+          imagePullPolicy: Always
+
+          ports:
+
+            - containerPort: 3000
+
+          resources:
+
+            requests:
+
+              cpu: "50m"
+
+              memory: "64Mi"
+
+            limits:
+
+              cpu: "200m"
+
+              memory: "256Mi"
+
+          livenessProbe:
+
+            httpGet:
+
+              path: /health
+
+              port: 3000
+
+            initialDelaySeconds: 20
+
+            periodSeconds: 15
+
+            failureThreshold: 3
+
+          readinessProbe:
+
+            httpGet:
+
+              path: /health
+
+              port: 3000
+
+            initialDelaySeconds: 10
+
+            periodSeconds: 10
+
+            failureThreshold: 3
+ 
