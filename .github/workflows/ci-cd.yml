@@ -1,0 +1,290 @@
+name: CI/CD Pipeline
+
+on:
+
+  push:
+
+    branches:
+
+      - main
+
+  pull_request:
+
+    branches:
+
+      - main
+
+env:
+
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+
+  REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
+
+  GKE_CLUSTER: ${{ secrets.GKE_CLUSTER_NAME }}
+
+  GKE_ZONE: ${{ secrets.GKE_CLUSTER_ZONE }}
+
+jobs:
+
+  build:
+
+    name: Build & Lint
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout code
+
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js for backend
+
+        uses: actions/setup-node@v4
+
+        with:
+
+          node-version: "20"
+
+          cache: "npm"
+
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+
+        working-directory: backend
+
+        run: npm ci
+
+      - name: Set up Node.js for frontend
+
+        uses: actions/setup-node@v4
+
+        with:
+
+          node-version: "20"
+
+          cache: "npm"
+
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+
+        working-directory: frontend
+
+        run: npm ci
+
+      - name: Build frontend
+
+        working-directory: frontend
+
+        run: npm run build
+
+        env:
+
+          REACT_APP_API_URL: /api
+
+      - name: Build backend Docker image check
+
+        run: docker build -t employee-portal-backend:test ./backend
+
+      - name: Build frontend Docker image check
+
+        run: |
+
+          docker build \
+
+            --build-arg REACT_APP_API_URL=/api \
+
+            -t employee-portal-frontend:test ./frontend
+
+  deploy:
+
+    name: Build, Push & Deploy
+
+    runs-on: ubuntu-latest
+
+    needs: build
+
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+
+      - name: Checkout code
+
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+
+        uses: google-github-actions/auth@v2
+
+        with:
+
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud CLI
+
+        uses: google-github-actions/setup-gcloud@v2
+
+        with:
+
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Configure Docker for Artifact Registry
+
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      - name: Set image tag
+
+        id: tag
+
+        run: echo "IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-8)" >> $GITHUB_OUTPUT
+
+      - name: Build backend image
+
+        run: |
+
+          docker build \
+
+            -t ${{ env.REGISTRY_URL }}/backend:${{ steps.tag.outputs.IMAGE_TAG }} \
+
+            -t ${{ env.REGISTRY_URL }}/backend:latest \
+
+            ./backend
+
+      - name: Push backend image
+
+        run: |
+
+          docker push ${{ env.REGISTRY_URL }}/backend:${{ steps.tag.outputs.IMAGE_TAG }}
+
+          docker push ${{ env.REGISTRY_URL }}/backend:latest
+
+      - name: Build frontend image
+
+        run: |
+
+          docker build \
+
+            --build-arg REACT_APP_API_URL=/api \
+
+            -t ${{ env.REGISTRY_URL }}/frontend:${{ steps.tag.outputs.IMAGE_TAG }} \
+
+            -t ${{ env.REGISTRY_URL }}/frontend:latest \
+
+            ./frontend
+
+      - name: Push frontend image
+
+        run: |
+
+          docker push ${{ env.REGISTRY_URL }}/frontend:${{ steps.tag.outputs.IMAGE_TAG }}
+
+          docker push ${{ env.REGISTRY_URL }}/frontend:latest
+
+      - name: Get GKE credentials
+
+        run: |
+
+          gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
+
+            --zone ${{ env.GKE_ZONE }} \
+
+            --project ${{ env.PROJECT_ID }}
+
+      - name: Run database migrations
+
+        run: |
+
+          kubectl run db-migrate \
+
+            --image=${{ env.REGISTRY_URL }}/backend:${{ steps.tag.outputs.IMAGE_TAG }} \
+
+            --restart=Never \
+
+            --rm \
+
+            --attach \
+
+            -n employee-portal \
+
+            --env="DB_HOST=${{ secrets.DB_HOST }}" \
+
+            --env="DB_PORT=5432" \
+
+            --env="DB_NAME=employee_portal" \
+
+            --env="DB_USER=empuser" \
+
+            --env="DB_PASSWORD=${{ secrets.DB_PASSWORD }}" \
+
+            -- node src/db/migrate.js
+
+        timeout-minutes: 5
+
+      - name: Deploy backend to GKE
+
+        run: |
+
+          kubectl set image deployment/employee-portal-backend \
+
+            backend=${{ env.REGISTRY_URL }}/backend:${{ steps.tag.outputs.IMAGE_TAG }} \
+
+            -n employee-portal
+
+          kubectl rollout status deployment/employee-portal-backend \
+
+            -n employee-portal \
+
+            --timeout=120s
+
+      - name: Deploy frontend to GKE
+
+        run: |
+
+          kubectl set image deployment/employee-portal-frontend \
+
+            frontend=${{ env.REGISTRY_URL }}/frontend:${{ steps.tag.outputs.IMAGE_TAG }} \
+
+            -n employee-portal
+
+          kubectl rollout status deployment/employee-portal-frontend \
+
+            -n employee-portal \
+
+            --timeout=120s
+
+      - name: Verify deployment
+
+        run: |
+
+          echo "=== Backend pods ==="
+
+          kubectl get pods -l app=employee-portal-backend -n employee-portal
+
+          echo "=== Frontend pods ==="
+
+          kubectl get pods -l app=employee-portal-frontend -n employee-portal
+
+          echo "=== Services ==="
+
+          kubectl get services -n employee-portal
+
+          echo "=== Ingress ==="
+
+          kubectl get ingress -n employee-portal
+
+      - name: Rollback on failure
+
+        if: failure()
+
+        run: |
+
+          echo "Deployment failed — rolling back..."
+
+          kubectl rollout undo deployment/employee-portal-backend -n employee-portal
+
+          kubectl rollout undo deployment/employee-portal-frontend -n employee-portal
+
+          echo "Rollback complete"
+ 
