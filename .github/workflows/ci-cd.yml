@@ -116,11 +116,21 @@ jobs:
 
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
+      - name: Connect kubectl to our GKE cluster
+
+        run: gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} --zone ${{ env.GKE_ZONE }} --project ${{ env.PROJECT_ID }}
+
       - name: Create image tag from git commit
 
         id: tag
 
         run: echo "IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-8)" >> $GITHUB_OUTPUT
+
+      - name: Generate package-lock for frontend
+
+        run: npm install --package-lock-only
+
+        working-directory: frontend
 
       - name: Build backend and tag it
 
@@ -149,10 +159,6 @@ jobs:
           docker push ${{ env.REGISTRY_URL }}/frontend:${{ steps.tag.outputs.IMAGE_TAG }}
 
           docker push ${{ env.REGISTRY_URL }}/frontend:latest
-
-      - name: Connect kubectl to our GKE cluster
-
-        run: gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} --zone ${{ env.GKE_ZONE }} --project ${{ env.PROJECT_ID }}
 
       - name: Run database migrations
 
