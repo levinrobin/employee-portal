@@ -1,3 +1,5 @@
+# Terraform
+
 .terraform/
 
 terraform/.terraform/
@@ -8,14 +10,23 @@ terraform/.terraform/
 
 .terraform.lock.hcl
 
+# Node
+
 node_modules/
 
 build/
+
+# Environment
 
 .env
 
 .env.*
 
-*.json
+# Keys only — NOT all json files
+
+github-actions-key.json
+
+# OS
+
+.DS_Store
  
- .DS_Store
