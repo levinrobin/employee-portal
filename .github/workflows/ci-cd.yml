@@ -66,7 +66,7 @@ jobs:
 
         env:
 
-          REACT_APP_API_URL: http://34.136.213.65:3001/api
+          REACT_APP_API_URL: http://136.119.21365:3001/api
 
       - name: Build backend Docker image
 
@@ -76,7 +76,7 @@ jobs:
 
       - name: Build frontend Docker image
 
-        run: docker build -t frontend-test --build-arg REACT_APP_API_URL=http://34.136.213.65:3001/api .
+        run: docker build -t frontend-test --build-arg REACT_APP_API_URL=http://136.119.21365:3001/api .
 
         working-directory: frontend
 
@@ -156,7 +156,7 @@ jobs:
 
       - name: Build frontend and tag it
 
-        run: docker build -t ${{ env.REGISTRY_URL }}/frontend:${{ steps.tag.outputs.IMAGE_TAG }} -t ${{ env.REGISTRY_URL }}/frontend:latest --build-arg REACT_APP_API_URL=http://34.136.213.65:3001/api .
+        run: docker build -t ${{ env.REGISTRY_URL }}/frontend:${{ steps.tag.outputs.IMAGE_TAG }} -t ${{ env.REGISTRY_URL }}/frontend:latest --build-arg REACT_APP_API_URL=http://136.119.21365:3001/api .
 
         working-directory: frontend
 
