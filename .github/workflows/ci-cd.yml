@@ -112,6 +112,10 @@ jobs:
 
           project_id: ${{ env.PROJECT_ID }}
 
+      - name: Install gke-gcloud-auth-plugin
+
+        run: gcloud components install gke-gcloud-auth-plugin --quiet
+
       - name: Allow docker to push to GCP
 
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
@@ -119,6 +123,10 @@ jobs:
       - name: Connect kubectl to our GKE cluster
 
         run: gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} --zone ${{ env.GKE_ZONE }} --project ${{ env.PROJECT_ID }}
+
+        env:
+
+          USE_GKE_GCLOUD_AUTH_PLUGIN: True
 
       - name: Create image tag from git commit
 
@@ -166,21 +174,41 @@ jobs:
 
         timeout-minutes: 5
 
+        env:
+
+          USE_GKE_GCLOUD_AUTH_PLUGIN: True
+
       - name: Update backend deployment with new image
 
         run: kubectl set image deployment/employee-portal-backend backend=${{ env.REGISTRY_URL }}/backend:${{ steps.tag.outputs.IMAGE_TAG }} -n employee-portal
+
+        env:
+
+          USE_GKE_GCLOUD_AUTH_PLUGIN: True
 
       - name: Wait for backend to finish deploying
 
         run: kubectl rollout status deployment/employee-portal-backend -n employee-portal --timeout=120s
 
+        env:
+
+          USE_GKE_GCLOUD_AUTH_PLUGIN: True
+
       - name: Update frontend deployment with new image
 
         run: kubectl set image deployment/employee-portal-frontend frontend=${{ env.REGISTRY_URL }}/frontend:${{ steps.tag.outputs.IMAGE_TAG }} -n employee-portal
 
+        env:
+
+          USE_GKE_GCLOUD_AUTH_PLUGIN: True
+
       - name: Wait for frontend to finish deploying
 
         run: kubectl rollout status deployment/employee-portal-frontend -n employee-portal --timeout=120s
+
+        env:
+
+          USE_GKE_GCLOUD_AUTH_PLUGIN: True
 
       - name: Check everything is running
 
@@ -192,6 +220,10 @@ jobs:
 
           kubectl get ingress -n employee-portal
 
+        env:
+
+          USE_GKE_GCLOUD_AUTH_PLUGIN: True
+
       - name: Rollback if something went wrong
 
         if: failure()
@@ -201,4 +233,8 @@ jobs:
           kubectl rollout undo deployment/employee-portal-backend -n employee-portal
 
           kubectl rollout undo deployment/employee-portal-frontend -n employee-portal
+
+        env:
+
+          USE_GKE_GCLOUD_AUTH_PLUGIN: True
  
